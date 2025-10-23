@@ -1,0 +1,1 @@
+An event planning system for organizing events like conferences or workshops. Users can schedule sessions, assign speakers, and view the event schedule on a calendar, with tasks processed in parallel to handle large events. 
