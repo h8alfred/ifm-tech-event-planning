@@ -7,7 +7,19 @@ const FORM_CONTAINER_SX = { maxWidth: 1100, width: '100%', mx: 'auto', p: 2 };
 export default function SessionsPage() {
     return (
         <Box sx={FORM_CONTAINER_SX}>
-            <Typography variant="h5" sx={{ mb: 2 }}>Sessions</Typography>
+            <Typography
+                variant="h5"
+                sx={{
+                    mb: 2,
+                    textAlign: 'center',
+                    bgcolor: '#eef6ff',
+                    px: 2,
+                    py: 1,
+                    borderRadius: 1
+                }}
+            >
+                Event Planning System
+            </Typography>
 
             {/* Render calendar */}
             <Box sx={{ mb: 3 }}>

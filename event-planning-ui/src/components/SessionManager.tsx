@@ -2,6 +2,53 @@
 import { useEffect, useState } from 'react';
 import type { SessionDTO, Page } from '../types';
 import * as api from '../api/sessionApi';
+import { DataGrid, type GridColDef, type GridRenderCellParams } from '@mui/x-data-grid';
+
+const INPUT_STYLE: React.CSSProperties = {
+    height: 44,
+    padding: '8px 12px',
+    fontSize: 16,
+    minWidth: 160,
+    boxSizing: 'border-box'
+};
+
+const BUTTON_STYLE: React.CSSProperties = {
+    padding: '8px 14px',
+    fontSize: 16
+};
+
+const SMALL_BUTTON_STYLE: React.CSSProperties = {
+    padding: '4px 8px',
+    fontSize: 12,
+    borderRadius: 4,
+    lineHeight: '1',
+    cursor: 'pointer'
+};
+
+const FORM_ROW_STYLE: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'nowrap',
+    overflowX: 'auto',
+    marginBottom: 12
+};
+
+function formatDate(value: unknown) {
+    if (value == null || value === '') return '';
+    const s = String(value);
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) {
+        try {
+            const d2 = new Date(s + (s.endsWith('Z') ? '' : 'Z'));
+            if (!Number.isNaN(d2.getTime())) return d2.toLocaleString();
+        } catch {
+            return '';
+        }
+        return '';
+    }
+    return d.toLocaleString();
+}
 
 export default function SessionManager() {
     const [page, setPage] = useState<Page<SessionDTO> | null>(null);
@@ -19,38 +66,11 @@ export default function SessionManager() {
     });
     const [editingId, setEditingId] = useState<number | null>(null);
 
-    // search/filter state (includes date range)
-    const [searchSpeaker, setSearchSpeaker] = useState<string>('');
-    const [searchPriority, setSearchPriority] = useState<string>(''); // empty = no filter
-    const [searchStartDate, setSearchStartDate] = useState<string>(''); // YYYY-MM-DD
-    const [searchEndDate, setSearchEndDate] = useState<string>('');     // YYYY-MM-DD
-
-    // Convert a YYYY-MM-DD string to an ISO timestamp. endOfDay toggles to 23:59:59.
-    function toIso(dateStr: string | undefined, endOfDay = false) {
-        if (!dateStr) return undefined;
-        const t = endOfDay ? 'T23:59:59' : 'T00:00:00';
-        const d = new Date(dateStr + t);
-        return d.toISOString();
-    }
-
-    function buildFilters() {
-        const speaker = searchSpeaker.trim() || undefined;
-        const priority = searchPriority === '' ? undefined : Number(searchPriority);
-        const startDateTime = searchStartDate ? toIso(searchStartDate, false) : undefined;
-        const endDateTime = searchEndDate ? toIso(searchEndDate, true) : undefined;
-        return {
-            ...(speaker ? { speaker } : {}),
-            ...(priority != null ? { priority } : {}),
-            ...(startDateTime ? { startDateTime } : {}),
-            ...(endDateTime ? { endDateTime } : {})
-        };
-    }
-
     async function load(p = 0, size = 10, filters?: { speaker?: string; priority?: number; startDateTime?: string; endDateTime?: string }) {
         setLoading(true);
         setError(null);
         try {
-            const query = { page: p, size, sortBy: 'startDateTime', ...(filters || buildFilters()) };
+            const query = { page: p, size, sortBy: 'startDateTime', ...(filters || {}) };
             const data = await api.getSessions(query);
             setPage(data);
         } catch (e: any) {
@@ -74,9 +94,11 @@ export default function SessionManager() {
         setError(null);
         try {
             if (editingId != null) {
-                await api.updateSession(editingId, form);
+                const updated = await api.updateSession(editingId, form);
+                window.dispatchEvent(new CustomEvent('sessions-updated', { detail: { action: 'update', session: updated, id: editingId } }));
             } else {
-                await api.createSession(form);
+                const created = await api.createSession(form);
+                window.dispatchEvent(new CustomEvent('sessions-updated', { detail: { action: 'create', session: created } }));
             }
             setForm({ endDateTime: "", id: undefined, priority: 0, speaker: "", startDateTime: "", title: "", vip: false });
             setEditingId(null);
@@ -95,7 +117,8 @@ export default function SessionManager() {
         setError(null);
         try {
             await api.deleteSession(id);
-            await load(page?.number ?? 0, page?.size ?? 10, buildFilters());
+            window.dispatchEvent(new CustomEvent('sessions-updated', { detail: { action: 'delete', id } }));
+            await load(page?.number ?? 0, page?.size ?? 10);
         } catch (e: any) {
             console.error(e);
             setError(e?.message || 'Delete failed');
@@ -114,155 +137,185 @@ export default function SessionManager() {
         setForm({ endDateTime: "", id: undefined, priority: 0, speaker: "", startDateTime: "", title: "", vip: false });
     }
 
-    // apply search filters (resets to first page)
-    function applySearch() {
-        load(0, page?.size ?? 10, buildFilters());
-    }
+    const rows = (page?.content ?? []).map((s, i) => ({
+        ...s,
+        id: s.id ?? `tmp-${i}`
+    }));
 
-    function clearSearch() {
-        setSearchSpeaker('');
-        setSearchPriority('');
-        setSearchStartDate('');
-        setSearchEndDate('');
-        load(0, page?.size ?? 10, {});
-    }
-
-    const currentFilters = buildFilters();
+    const columns: GridColDef[] = [
+        { field: 'title', headerName: 'Title', flex: 1, minWidth: 150 },
+        { field: 'speaker', headerName: 'Speaker', width: 180 },
+        {
+            field: 'startDateTime',
+            headerName: 'Start',
+            width: 180,
+            renderCell: (params: GridRenderCellParams) => formatDate(params.value)
+        },
+        {
+            field: 'endDateTime',
+            headerName: 'End',
+            width: 180,
+            renderCell: (params: GridRenderCellParams) => formatDate(params.value)
+        },
+        { field: 'priority', headerName: 'Priority', width: 100, align: 'center', headerAlign: 'center' },
+        {
+            field: 'vip',
+            headerName: 'VIP',
+            width: 90,
+            align: 'center',
+            headerAlign: 'center',
+            renderCell: (params: GridRenderCellParams) => (params.value ? 'Yes' : 'No')
+        },
+        {
+            field: 'actions',
+            headerName: 'Actions',
+            width: 150,
+            sortable: false,
+            filterable: false,
+            renderCell: (params: GridRenderCellParams) => {
+                const row = params.row as SessionDTO & { id: number | string };
+                const numericId = typeof row.id === 'number' ? row.id : undefined;
+                return (
+                    <div>
+                        <button onClick={() => startEdit(row)} style={SMALL_BUTTON_STYLE}>Edit</button>
+                        <button onClick={() => numericId && remove(numericId)} style={{ marginLeft: 6, ...SMALL_BUTTON_STYLE }}>Delete</button>
+                    </div>
+                );
+            }
+        }
+    ];
 
     return (
         <div>
-            <h2>Sessions</h2>
+            <h2 style={{ textAlign: 'center', marginBottom: 12 }}>Event Sessions</h2>
             {loading && <div>Loading...</div>}
             {error && <div style={{ color: 'red' }}>{error}</div>}
 
-            {/* Search / filter bar */}
-            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <input
-                    placeholder="Filter by speaker"
-                    value={searchSpeaker}
-                    onChange={(e) => setSearchSpeaker(e.target.value)}
-                />
-                <input
-                    type="number"
-                    placeholder="Filter by priority"
-                    value={searchPriority}
-                    onChange={(e) => setSearchPriority(e.target.value)}
-                    style={{ width: 120 }}
-                />
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 12 }}>From</span>
-                    <input
-                        type="date"
-                        value={searchStartDate}
-                        onChange={(e) => setSearchStartDate(e.target.value)}
-                    />
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 12 }}>To</span>
-                    <input
-                        type="date"
-                        value={searchEndDate}
-                        onChange={(e) => setSearchEndDate(e.target.value)}
-                    />
-                </label>
-                <button onClick={applySearch}>Search</button>
-                <button onClick={clearSearch} style={{ marginLeft: 8 }}>Clear</button>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
+            <div style={FORM_ROW_STYLE}>
                 <input
                     placeholder="Title"
                     value={form.title ?? ''}
                     onChange={(e) => onChange('title', e.target.value)}
+                    style={INPUT_STYLE}
                 />
                 <input
                     placeholder="Speaker"
                     value={form.speaker ?? ''}
                     onChange={(e) => onChange('speaker', e.target.value)}
-                    style={{ marginLeft: 8 }}
+                    style={{ ...INPUT_STYLE }}
                 />
                 <input
                     type="datetime-local"
                     placeholder="Start"
                     value={form.startDateTime ? form.startDateTime.replace('Z', '') : ''}
                     onChange={(e) => onChange('startDateTime', e.target.value)}
-                    style={{ marginLeft: 8 }}
+                    style={{ ...INPUT_STYLE, minWidth: 200, width: 220 }}
                 />
                 <input
                     type="datetime-local"
                     placeholder="End"
                     value={form.endDateTime ? form.endDateTime.replace('Z', '') : ''}
                     onChange={(e) => onChange('endDateTime', e.target.value)}
-                    style={{ marginLeft: 8 }}
+                    style={{ ...INPUT_STYLE, minWidth: 200, width: 220 }}
                 />
                 <input
                     type="number"
                     placeholder="Priority"
                     value={form.priority ?? ''}
                     onChange={(e) => onChange('priority', Number(e.target.value))}
-                    style={{ width: 96, marginLeft: 8 }}
+                    style={{ ...INPUT_STYLE, width: 120, minWidth: 120 }}
                 />
-                <label style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <input
                         type="checkbox"
                         checked={!!form.vip}
                         onChange={(e) => onChange('vip', e.target.checked)}
-                        style={{ marginRight: 4 }}
+                        style={{ transform: 'scale(1.2)' }}
                     />
                     VIP
                 </label>
-                <button onClick={submit} style={{ marginLeft: 8 }}>
+                <button onClick={submit} style={{ marginLeft: 8, ...BUTTON_STYLE }}>
                     {editingId != null ? 'Update' : 'Create'}
                 </button>
-                {editingId != null && <button onClick={cancelEdit} style={{ marginLeft: 8 }}>Cancel</button>}
+                {editingId != null && <button onClick={cancelEdit} style={{ marginLeft: 8, ...BUTTON_STYLE }}>Cancel</button>}
             </div>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                <tr>
-                    <th style={{ textAlign: 'left' }}>Title</th>
-                    <th style={{ textAlign: 'left' }}>Speaker</th>
-                    <th style={{ textAlign: 'left' }}>Start</th>
-                    <th style={{ textAlign: 'left' }}>End</th>
-                    <th style={{ textAlign: 'left' }}>Priority</th>
-                    <th style={{ textAlign: 'left' }}>VIP</th>
-                    <th>Actions</th>
-                </tr>
-                </thead>
-                <tbody>
-                {page?.content?.map((s) => (
-                    <tr key={s.id ?? Math.random()}>
-                        <td>{s.title}</td>
-                        <td>{s.speaker}</td>
-                        <td>{s.startDateTime}</td>
-                        <td>{s.endDateTime}</td>
-                        <td>{s.priority}</td>
-                        <td>{s.vip ? 'Yes' : 'No'}</td>
-                        <td>
-                            <button onClick={() => startEdit(s)}>Edit</button>
-                            <button onClick={() => remove(s.id)} style={{ marginLeft: 8 }}>Delete</button>
-                        </td>
-                    </tr>
-                )) ?? <tr><td colSpan={7}>No sessions</td></tr>}
-                </tbody>
-            </table>
-
-            <div style={{ marginTop: 8 }}>
-                <button
-                    onClick={() => load(Math.max(0, (page?.number ?? 0) - 1), page?.size ?? 10, currentFilters)}
-                    disabled={(page?.number ?? 0) <= 0}
-                >
-                    Prev
-                </button>
-                <span style={{ margin: '0 8px' }}>
-          Page {(page?.number ?? 0) + 1} of {page?.totalPages ?? 1}
-        </span>
-                <button
-                    onClick={() => load((page?.number ?? 0) + 1, page?.size ?? 10, currentFilters)}
-                    disabled={(page?.number ?? 0) + 1 >= (page?.totalPages ?? 1)}
-                >
-                    Next
-                </button>
+            <div style={{ width: '100%' }}>
+                <DataGrid
+                    rows={rows}
+                    columns={columns}
+                    pagination
+                    paginationMode="server"
+                    rowCount={page?.totalElements ?? 0}
+                    paginationModel={{ page: page?.number ?? 0, pageSize: page?.size ?? 10 }}
+                    onPaginationModelChange={(model: { page: number; pageSize: number }) => load(model.page, model.pageSize)}
+                    loading={loading}
+                    autoHeight
+                    disableRowSelectionOnClick
+                    sx={{
+                        border: '1px solid rgba(20,24,28,0.08)',
+                        borderRadius: 1,
+                        fontFamily: 'Inter, Roboto, Arial, sans-serif',
+                        backgroundColor: '#ffffff',
+                        // header styling - medium dark gray for title row
+                        '& .MuiDataGrid-columnHeaders': {
+                            backgroundColor: '#374151', // medium dark gray
+                            borderBottom: '1px solid rgba(255,255,255,0.06)',
+                            minHeight: 56,
+                            height: 56,
+                            '&, & .MuiDataGrid-columnHeader, & .MuiDataGrid-columnHeaderTitleContainer': {
+                                color: '#fff'
+                            }
+                        },
+                        '& .MuiDataGrid-columnHeader': {
+                            backgroundColor: '#374151',
+                            color: '#fff !important',
+                            zIndex: 2
+                        },
+                        '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitle': {
+                            color: '#fff !important',
+                            fontSize: 13,
+                            fontWeight: 800,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        },
+                        '& .MuiDataGrid-cell': {
+                            fontSize: 13
+                        },
+                        '& .MuiDataGrid-row:nth-of-type(odd)': {
+                            backgroundColor: '#ffffff',
+                            '& .MuiDataGrid-cell, & .MuiDataGrid-cellContent': {
+                                color: '#0b1220'
+                            }
+                        },
+                        '& .MuiDataGrid-row:nth-of-type(even)': {
+                            backgroundColor: '#f7fafc',
+                            '& .MuiDataGrid-cell, & .MuiDataGrid-cellContent': {
+                                color: '#0b1220'
+                            }
+                        },
+                        '& .MuiDataGrid-row:hover': {
+                            backgroundColor: '#e6eef8 !important'
+                        },
+                        '& .MuiDataGrid-row.Mui-selected': {
+                            backgroundColor: '#dbeafe !important',
+                            '& .MuiDataGrid-cell': {
+                                color: '#0b1220'
+                            }
+                        },
+                        '& .MuiDataGrid-footerContainer': {
+                            backgroundColor: '#f3f4f6',
+                            borderTop: '1px solid rgba(20,24,28,0.06)'
+                        },
+                        '& .MuiDataGrid-selectedRowCount': {
+                            color: '#334155'
+                        },
+                        '& .MuiDataGrid-iconButtonContainer': {
+                            color: '#475569'
+                        }
+                    }}
+                />
             </div>
         </div>
     );
