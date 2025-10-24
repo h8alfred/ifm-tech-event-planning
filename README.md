@@ -9,7 +9,7 @@ This README explains how to run the backend (Spring Boot / Maven) and the fronte
 
 ## Backend (Spring Boot)
 
-From the repository root:
+From the event-planning folder:
 
 1.  Run with Maven (development):
    mvn spring-boot:run
