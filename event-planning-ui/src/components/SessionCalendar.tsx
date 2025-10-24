@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {
     Box,
     Grid,
@@ -12,10 +12,10 @@ import {
     Typography,
     Chip
 } from '@mui/material';
-import type { SessionDTO } from '../types';
+import type {SessionDTO} from '../types';
 import * as api from '../api/sessionApi';
 
-const FORM_CONTAINER_SX = { maxWidth: 1100, width: '100%', mx: 'auto', p: 2 };
+const FORM_CONTAINER_SX = {maxWidth: 1100, width: '100%', mx: 'auto', p: 2};
 
 function toIsoDateTime(dateStr: string | undefined, endOfDay = false) {
     if (!dateStr) return undefined;
@@ -66,7 +66,7 @@ export default function SessionCalendar() {
             if (startIso) filters.startDateTime = startIso;
             if (endIso) filters.endDateTime = endIso;
 
-            const query = { page: 0, size: 1000, sortBy: 'startDateTime', ...filters };
+            const query = {page: 0, size: 1000, sortBy: 'startDateTime', ...filters};
             const page = await api.getSessions(query);
             setSessions(page?.content ?? []);
         } catch (e: any) {
@@ -99,7 +99,7 @@ export default function SessionCalendar() {
             days.push(d);
         }
 
-        return { days, monthStart, monthEnd };
+        return {days, monthStart, monthEnd};
     }, [startDate]);
 
     // Map events into day buckets (include multi-day)
@@ -137,11 +137,12 @@ export default function SessionCalendar() {
 
     return (
         <Box sx={FORM_CONTAINER_SX}>
-            <Paper variant="outlined" sx={{ p: 1, bgcolor: '#fbfcff' }}>
+            <Paper variant="outlined" sx={{p: 1, bgcolor: '#fbfcff'}}>
                 {/* Filters moved inside Paper so they appear above the calendar */}
-                <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
+                <Grid container spacing={2} alignItems="center" sx={{mb: 1}}>
                     <Grid item xs={12} sm={6} md={3}>
-                        <TextField label="Speaker" value={speaker} onChange={(e) => setSpeaker(e.target.value)} fullWidth size="small" />
+                        <TextField label="Speaker" value={speaker} onChange={(e) => setSpeaker(e.target.value)}
+                                   fullWidth size="small"/>
                     </Grid>
 
                     <Grid item xs={6} sm={3} md={2}>
@@ -161,16 +162,29 @@ export default function SessionCalendar() {
                     </Grid>
 
                     <Grid item xs={6} sm={3} md={2}>
-                        <TextField label="From" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth size="small" />
+                        <TextField label="From" type="date" value={startDate}
+                                   onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{shrink: true}}
+                                   fullWidth size="small"/>
                     </Grid>
 
                     <Grid item xs={6} sm={3} md={2}>
-                        <TextField label="To" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth size="small" />
+                        <TextField label="To" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                                   InputLabelProps={{shrink: true}} fullWidth size="small"/>
                     </Grid>
 
                     <Grid item xs={12} sm={6} md={3} container spacing={1} alignItems="center">
                         <Grid item>
-                            <Button variant="contained" onClick={() => load()} disabled={loading}>Apply</Button>
+                            <Button
+                                variant="contained"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    load();
+                                }}
+                                disabled={loading}
+                            >
+                                Apply
+                            </Button>
                         </Grid>
                         <Grid item>
                             <Button
@@ -194,34 +208,39 @@ export default function SessionCalendar() {
                         </Grid>
                         {loading && (
                             <Grid item>
-                                <CircularProgress size={24} />
+                                <CircularProgress size={24}/>
                             </Grid>
                         )}
                     </Grid>
                 </Grid>
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1}}>
                     <Box>
                         <Button size="small" onClick={() => changeMonth(-1)}>Prev</Button>
                         <Button size="small" onClick={() => changeMonth(1)}>Next</Button>
                     </Box>
                     <Typography variant="h6">
-                        {new Date(startDate + 'T00:00:00').toLocaleDateString([], { month: 'long', year: 'numeric' })}
+                        {new Date(startDate + 'T00:00:00').toLocaleDateString([], {month: 'long', year: 'numeric'})}
                     </Typography>
-                    <Box sx={{ width: 48 }} />
+                    <Box sx={{width: 48}}/>
                 </Box>
 
                 {/* weekday header */}
-                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderTop: '1px solid rgba(0,0,0,0.04)', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(7, 1fr)',
+                    borderTop: '1px solid rgba(0,0,0,0.04)',
+                    borderBottom: '1px solid rgba(0,0,0,0.04)'
+                }}>
                     {weekdayLabels.map((w) => (
-                        <Box key={w} sx={{ p: 1, textAlign: 'center', bgcolor: '#fff' }}>
+                        <Box key={w} sx={{p: 1, textAlign: 'center', bgcolor: '#fff'}}>
                             <Typography variant="subtitle2">{w}</Typography>
                         </Box>
                     ))}
                 </Box>
 
                 {/* days grid */}
-                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, mt: 1 }}>
+                <Box sx={{display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, mt: 1}}>
                     {calendarDays.days.map((d) => {
                         const key = formatYMD(d);
                         const inMonth = d >= calendarDays.monthStart && d <= calendarDays.monthEnd;
@@ -242,23 +261,32 @@ export default function SessionCalendar() {
                                     overflow: 'hidden'
                                 }}
                             >
-                                <Box sx={{ position: 'absolute', top: 6, right: 6 }}>
-                                    <Typography variant="caption" sx={{ opacity: 0.7 }}>{d.getDate()}</Typography>
+                                <Box sx={{position: 'absolute', top: 6, right: 6}}>
+                                    <Typography variant="caption" sx={{opacity: 0.7}}>{d.getDate()}</Typography>
                                 </Box>
 
-                                <Box sx={{ mt: 2 }}>
+                                <Box sx={{mt: 2}}>
                                     {dayEvents.slice(0, maxVisible).map((ev) => {
-                                        const startText = ev.startDateTime ? new Date(ev.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-                                        const endText = ev.endDateTime ? new Date(ev.endDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                                        const startText = ev.startDateTime ? new Date(ev.startDateTime).toLocaleTimeString([], {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        }) : '';
+                                        const endText = ev.endDateTime ? new Date(ev.endDateTime).toLocaleTimeString([], {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        }) : '';
                                         return (
                                             <Tooltip
                                                 key={String(ev.id)}
                                                 title={
                                                     <Box>
-                                                        <Typography sx={{ fontWeight: 700 }}>{ev.title}</Typography>
-                                                        {ev.speaker && <Typography variant="body2">Speaker: {ev.speaker}</Typography>}
-                                                        <Typography variant="body2">{startText}{startText && endText ? ' — ' : ''}{endText}</Typography>
-                                                        {typeof ev.priority !== 'undefined' && <Typography variant="body2">Priority: {ev.priority}</Typography>}
+                                                        <Typography sx={{fontWeight: 700}}>{ev.title}</Typography>
+                                                        {ev.speaker && <Typography
+                                                            variant="body2">Speaker: {ev.speaker}</Typography>}
+                                                        <Typography
+                                                            variant="body2">{startText}{startText && endText ? ' — ' : ''}{endText}</Typography>
+                                                        {typeof ev.priority !== 'undefined' && <Typography
+                                                            variant="body2">Priority: {ev.priority}</Typography>}
                                                     </Box>
                                                 }
                                                 arrow
@@ -282,13 +310,14 @@ export default function SessionCalendar() {
                                     })}
 
                                     {extra > 0 && (
-                                        <Typography variant="caption" sx={{ mt: 0.5, display: 'block', color: 'text.secondary' }}>
+                                        <Typography variant="caption"
+                                                    sx={{mt: 0.5, display: 'block', color: 'text.secondary'}}>
                                             +{extra} more
                                         </Typography>
                                     )}
 
                                     {dayEvents.length === 0 && (
-                                        <Box sx={{ mt: 1, opacity: 0.04 }}>
+                                        <Box sx={{mt: 1, opacity: 0.04}}>
                                             <Typography variant="caption">No events</Typography>
                                         </Box>
                                     )}
